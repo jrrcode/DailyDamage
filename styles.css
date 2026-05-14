@@ -84,7 +84,7 @@ button {
   top: 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: 160px 1fr 220px;
+  grid-template-columns: 160px 1fr minmax(430px, auto);
   align-items: center;
   gap: 18px;
   border-bottom: 1px solid transparent;
@@ -165,6 +165,43 @@ body.black-theme .sidebar.scrolled {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 0;
+}
+
+.backup-pill {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 10px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  font-size: 0.72rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.backup-pill.due {
+  border-color: rgba(248, 113, 113, 0.34);
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.backup-action {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: var(--surface-soft);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.backup-action:hover {
+  border-color: rgba(20, 216, 196, 0.38);
+  background: rgba(20, 216, 196, 0.12);
+}
+
+.backup-file-input {
+  display: none;
 }
 
 .month-card input {
@@ -362,6 +399,39 @@ h2 {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.storage-toast {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 90;
+  display: flex;
+  max-width: min(420px, calc(100vw - 32px));
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.storage-toast span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.storage-toast button {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 10px;
+  color: #06120f;
+  background: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 900;
 }
 
 .view {
@@ -1802,7 +1872,14 @@ h2 {
 
   .month-card {
     width: 100%;
+    flex-wrap: wrap;
     justify-content: center;
+  }
+
+  .backup-pill {
+    order: 3;
+    width: 100%;
+    text-align: center;
   }
 
   .workspace {

@@ -1,12 +1,19 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 const STORAGE = {
+  backupMeta: "ledgerly:backupMeta",
   theme: "ledgerly:theme",
+  month: "ledgerly:month",
   savings: "ledgerly:savings",
   expenses: "ledgerly:expenses",
   creditLoans: "ledgerly:creditLoans",
 };
+
+const DB_NAME = "daily-damage-local";
+const DB_VERSION = 1;
+const DB_STORE = "settings";
+const BACKUP_STALE_DAYS = 14;
 
 const institutionTypes = [
   { value: "bank", label: "Traditional bank" },
@@ -37,7 +44,69 @@ function load(key, fallback) {
 }
 
 function save(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // localStorage can fail in private browsing or restricted browsers.
+  }
+}
+
+function openLocalDb() {
+  return new Promise((resolve, reject) => {
+    if (!("indexedDB" in window)) {
+      reject(new Error("IndexedDB is not available"));
+      return;
+    }
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = () => request.result.createObjectStore(DB_STORE);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+  });
+}
+
+function idbGet(key, fallback) {
+  return openLocalDb().then((db) => new Promise((resolve, reject) => {
+    const request = db.transaction(DB_STORE, "readonly").objectStore(DB_STORE).get(key);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result ?? fallback);
+  }));
+}
+
+function idbSet(key, value) {
+  return openLocalDb().then((db) => new Promise((resolve, reject) => {
+    const request = db.transaction(DB_STORE, "readwrite").objectStore(DB_STORE).put(value, key);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve();
+  }));
+}
+
+function saveDurable(key, value) {
+  save(key, value);
+  return idbSet(key, value).catch(() => {});
+}
+
+function fallbackSnapshot() {
+  return {
+    theme: load(STORAGE.theme, "black"),
+    month: load(STORAGE.month, new Date().toISOString().slice(0, 7)),
+    savings: load(STORAGE.savings, []),
+    expenses: load(STORAGE.expenses, []),
+    creditLoans: load(STORAGE.creditLoans, []),
+    backupMeta: load(STORAGE.backupMeta, { lastBackupAt: "" }),
+  };
+}
+
+function cleanExpanded(items) {
+  return items.map(({ expanded, ...item }) => item);
+}
+
+function datedFileStamp() {
+  return new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+}
+
+function daysSince(value) {
+  if (!value) return Infinity;
+  return Math.floor((Date.now() - new Date(value).getTime()) / 86400000);
 }
 
 function todayISO() {
@@ -168,12 +237,17 @@ function reorder(items, draggedId, targetId, filter) {
 }
 
 function App() {
+  const initial = fallbackSnapshot();
+  const importInputRef = useRef(null);
   const [view, setView] = useState("dashboard");
-  const [theme, setTheme] = useState(load(STORAGE.theme, "black"));
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [savings, setSavings] = useState(load(STORAGE.savings, []).map((item) => ({ ...item, expanded: false })));
-  const [expenses, setExpenses] = useState(load(STORAGE.expenses, []).map((item) => ({ ...item, expanded: false })));
-  const [creditLoans, setCreditLoans] = useState(load(STORAGE.creditLoans, []).map((item) => ({ ...item, expanded: false })));
+  const [theme, setTheme] = useState(initial.theme);
+  const [month, setMonth] = useState(initial.month);
+  const [savings, setSavings] = useState(initial.savings.map((item) => ({ ...item, expanded: false })));
+  const [expenses, setExpenses] = useState(initial.expenses.map((item) => ({ ...item, expanded: false })));
+  const [creditLoans, setCreditLoans] = useState(initial.creditLoans.map((item) => ({ ...item, expanded: false })));
+  const [backupMeta, setBackupMeta] = useState(initial.backupMeta);
+  const [storageReady, setStorageReady] = useState(false);
+  const [storageNotice, setStorageNotice] = useState("");
   const [forms, setForms] = useState({ money: false, expense: false, credit: false });
   const [modes, setModes] = useState({
     moneyDelete: {}, moneyEdit: {}, expenseDelete: {}, expenseEdit: {}, creditDelete: {}, creditEdit: {},
@@ -182,13 +256,91 @@ function App() {
   const [modal, setModal] = useState(null);
   const [scrolled, setScrolled] = useState(false);
 
-  useEffect(() => save(STORAGE.theme, theme), [theme]);
-  useEffect(() => save(STORAGE.savings, savings), [savings]);
-  useEffect(() => save(STORAGE.expenses, expenses), [expenses]);
-  useEffect(() => save(STORAGE.creditLoans, creditLoans), [creditLoans]);
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      idbGet(STORAGE.theme, initial.theme),
+      idbGet(STORAGE.month, initial.month),
+      idbGet(STORAGE.savings, initial.savings),
+      idbGet(STORAGE.expenses, initial.expenses),
+      idbGet(STORAGE.creditLoans, initial.creditLoans),
+      idbGet(STORAGE.backupMeta, initial.backupMeta),
+    ]).then(([nextTheme, nextMonth, nextSavings, nextExpenses, nextCreditLoans, nextBackupMeta]) => {
+      if (!active) return;
+      setTheme(nextTheme);
+      setMonth(nextMonth);
+      setSavings(nextSavings.map((item) => ({ ...item, expanded: false })));
+      setExpenses(nextExpenses.map((item) => ({ ...item, expanded: false })));
+      setCreditLoans(nextCreditLoans.map((item) => ({ ...item, expanded: false })));
+      setBackupMeta(nextBackupMeta);
+      setStorageReady(true);
+    }).catch(() => {
+      if (!active) return;
+      setStorageReady(true);
+      setStorageNotice("Using browser fallback storage. Export backups regularly.");
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => { if (storageReady) saveDurable(STORAGE.theme, theme); }, [theme, storageReady]);
+  useEffect(() => { if (storageReady) saveDurable(STORAGE.month, month); }, [month, storageReady]);
+  useEffect(() => { if (storageReady) saveDurable(STORAGE.savings, cleanExpanded(savings)); }, [savings, storageReady]);
+  useEffect(() => { if (storageReady) saveDurable(STORAGE.expenses, cleanExpanded(expenses)); }, [expenses, storageReady]);
+  useEffect(() => { if (storageReady) saveDurable(STORAGE.creditLoans, cleanExpanded(creditLoans)); }, [creditLoans, storageReady]);
+  useEffect(() => { if (storageReady) saveDurable(STORAGE.backupMeta, backupMeta); }, [backupMeta, storageReady]);
   useEffect(() => {
     document.body.classList.toggle("black-theme", theme === "black");
   }, [theme]);
+
+  const backupAge = daysSince(backupMeta.lastBackupAt);
+  const backupStatus = !backupMeta.lastBackupAt ? "Backup needed" : backupAge >= BACKUP_STALE_DAYS ? `${backupAge}d since backup` : "Backed up";
+
+  const exportBackup = () => {
+    const exportedAt = new Date().toISOString();
+    const payload = {
+      app: "Daily Damage",
+      version: 1,
+      exportedAt,
+      data: {
+        theme,
+        month,
+        savings: cleanExpanded(savings),
+        expenses: cleanExpanded(expenses),
+        creditLoans: cleanExpanded(creditLoans),
+      },
+    };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `daily-damage-backup-${datedFileStamp()}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setBackupMeta({ lastBackupAt: exportedAt });
+    setStorageNotice("Backup downloaded.");
+  };
+
+  const importBackup = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result || "{}"));
+        const data = parsed.data || parsed;
+        if (!Array.isArray(data.savings) || !Array.isArray(data.expenses) || !Array.isArray(data.creditLoans)) throw new Error("Invalid backup");
+        setTheme(data.theme || "black");
+        setMonth(data.month || new Date().toISOString().slice(0, 7));
+        setSavings(data.savings.map((item) => ({ ...item, expanded: false })));
+        setExpenses(data.expenses.map((item) => ({ ...item, expanded: false })));
+        setCreditLoans(data.creditLoans.map((item) => ({ ...item, expanded: false })));
+        setStorageNotice("Backup restored on this browser.");
+      } catch {
+        setStorageNotice("That file does not look like a Daily Damage backup.");
+      }
+    };
+    reader.readAsText(file);
+  };
 
   const updateAccount = (accountId, amountDelta) => {
     setSavings((items) => items.map((item) => item.id === accountId ? { ...item, amount: Number(item.amount || 0) + amountDelta } : item));
@@ -211,6 +363,10 @@ function App() {
         </nav>
         <div className="month-card">
           <label htmlFor="monthPicker">Workspace month</label>
+          <span className={`backup-pill ${backupAge >= BACKUP_STALE_DAYS ? "due" : ""}`}>{backupStatus}</span>
+          <button className="backup-action" type="button" onClick={exportBackup}>Export</button>
+          <button className="backup-action" type="button" onClick={() => importInputRef.current?.click()}>Import</button>
+          <input ref={importInputRef} className="backup-file-input" type="file" accept="application/json,.json" onChange={importBackup} />
           <input id="monthPicker" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
           <button className="theme-toggle icon-only" data-theme-icon={theme === "black" ? "light" : "dark"} onClick={() => setTheme(theme === "black" ? "light" : "black")} type="button" aria-label={theme === "black" ? "Switch to light theme" : "Switch to dark theme"} title={theme === "black" ? "Switch to light theme" : "Switch to dark theme"} />
         </div>
@@ -223,6 +379,7 @@ function App() {
       </main>
       {modal?.type === "delete" && <ConfirmModal title={`Delete ${modal.name}?`} copy={modal.copy} confirmText={modal.confirmText || "Delete"} danger onCancel={() => setModal(null)} onConfirm={() => { modal.onConfirm(); setModal(null); }} />}
       {modal?.type === "pay" && <ConfirmModal title={`Pay ${modal.expense.reason}?`} copy={modal.copy} confirmText="Confirm paid" onCancel={() => setModal(null)} onConfirm={() => { modal.onConfirm(); setModal(null); }} />}
+      {storageNotice && <div className="storage-toast"><span>{storageNotice}</span><button type="button" onClick={() => setStorageNotice("")}>Dismiss</button></div>}
     </div>
   );
 }
