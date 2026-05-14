@@ -2,3 +2,5 @@ node_modules/
 dist/
 .tools/
 assets/logos/*.original.png
+backups/
+app.js
