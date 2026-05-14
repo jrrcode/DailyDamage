@@ -363,6 +363,45 @@ h2 {
   box-shadow: 0 24px 90px rgba(0, 0, 0, 0.58);
 }
 
+.owner-reminder {
+  display: grid;
+  width: min(500px, 100%);
+  gap: 16px;
+  border: 1px solid rgba(20, 216, 196, 0.26);
+  border-radius: 20px;
+  padding: 24px;
+  background: var(--surface);
+  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.58);
+}
+
+.owner-reminder h2 {
+  margin-bottom: 0;
+}
+
+.owner-reminder-list {
+  display: grid;
+  gap: 10px;
+}
+
+.owner-reminder-list p {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: var(--surface-soft);
+}
+
+.owner-reminder-list strong {
+  font-size: 0.9rem;
+}
+
+.owner-reminder-list span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .delete-modal h2 {
   margin-bottom: 8px;
 }

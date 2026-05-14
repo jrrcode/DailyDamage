@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 
 const STORAGE = {
   backupMeta: "ledgerly:backupMeta",
+  ownerReminder: "ledgerly:ownerReminder",
   theme: "ledgerly:theme",
   month: "ledgerly:month",
   savings: "ledgerly:savings",
@@ -93,6 +94,7 @@ function fallbackSnapshot() {
     expenses: load(STORAGE.expenses, []),
     creditLoans: load(STORAGE.creditLoans, []),
     backupMeta: load(STORAGE.backupMeta, { lastBackupAt: "" }),
+    ownerReminder: load(STORAGE.ownerReminder, { acknowledgedAt: "" }),
   };
 }
 
@@ -246,6 +248,7 @@ function App() {
   const [expenses, setExpenses] = useState(initial.expenses.map((item) => ({ ...item, expanded: false })));
   const [creditLoans, setCreditLoans] = useState(initial.creditLoans.map((item) => ({ ...item, expanded: false })));
   const [backupMeta, setBackupMeta] = useState(initial.backupMeta);
+  const [ownerReminder, setOwnerReminder] = useState(initial.ownerReminder);
   const [storageReady, setStorageReady] = useState(false);
   const [storageNotice, setStorageNotice] = useState("");
   const [forms, setForms] = useState({ money: false, expense: false, credit: false });
@@ -265,7 +268,8 @@ function App() {
       idbGet(STORAGE.expenses, initial.expenses),
       idbGet(STORAGE.creditLoans, initial.creditLoans),
       idbGet(STORAGE.backupMeta, initial.backupMeta),
-    ]).then(([nextTheme, nextMonth, nextSavings, nextExpenses, nextCreditLoans, nextBackupMeta]) => {
+      idbGet(STORAGE.ownerReminder, initial.ownerReminder),
+    ]).then(([nextTheme, nextMonth, nextSavings, nextExpenses, nextCreditLoans, nextBackupMeta, nextOwnerReminder]) => {
       if (!active) return;
       setTheme(nextTheme);
       setMonth(nextMonth);
@@ -273,6 +277,7 @@ function App() {
       setExpenses(nextExpenses.map((item) => ({ ...item, expanded: false })));
       setCreditLoans(nextCreditLoans.map((item) => ({ ...item, expanded: false })));
       setBackupMeta(nextBackupMeta);
+      setOwnerReminder(nextOwnerReminder);
       setStorageReady(true);
     }).catch(() => {
       if (!active) return;
@@ -288,6 +293,7 @@ function App() {
   useEffect(() => { if (storageReady) saveDurable(STORAGE.expenses, cleanExpanded(expenses)); }, [expenses, storageReady]);
   useEffect(() => { if (storageReady) saveDurable(STORAGE.creditLoans, cleanExpanded(creditLoans)); }, [creditLoans, storageReady]);
   useEffect(() => { if (storageReady) saveDurable(STORAGE.backupMeta, backupMeta); }, [backupMeta, storageReady]);
+  useEffect(() => { if (storageReady) saveDurable(STORAGE.ownerReminder, ownerReminder); }, [ownerReminder, storageReady]);
   useEffect(() => {
     document.body.classList.toggle("black-theme", theme === "black");
   }, [theme]);
@@ -379,6 +385,7 @@ function App() {
       </main>
       {modal?.type === "delete" && <ConfirmModal title={`Delete ${modal.name}?`} copy={modal.copy} confirmText={modal.confirmText || "Delete"} danger onCancel={() => setModal(null)} onConfirm={() => { modal.onConfirm(); setModal(null); }} />}
       {modal?.type === "pay" && <ConfirmModal title={`Pay ${modal.expense.reason}?`} copy={modal.copy} confirmText="Confirm paid" onCancel={() => setModal(null)} onConfirm={() => { modal.onConfirm(); setModal(null); }} />}
+      {storageReady && !ownerReminder.acknowledgedAt && <OwnerReminder onConfirm={() => setOwnerReminder({ acknowledgedAt: new Date().toISOString() })} />}
       {storageNotice && <div className="storage-toast"><span>{storageNotice}</span><button type="button" onClick={() => setStorageNotice("")}>Dismiss</button></div>}
     </div>
   );
@@ -709,6 +716,10 @@ function Info({ label, value }) {
 
 function ActionRow({ onCancel, onSave }) {
   return <div className="detail-actions"><button className="text-button" type="button" onClick={onCancel}>Cancel</button><button className="primary-action detail-save" type="button" onClick={onSave}>Save</button></div>;
+}
+
+function OwnerReminder({ onConfirm }) {
+  return <div className="modal-backdrop" role="dialog" aria-modal="true"><div className="owner-reminder"><p className="eyebrow">Before using Daily Damage</p><h2>Your data is local to this browser</h2><div className="owner-reminder-list"><p><strong>Use the same browser.</strong><span>Chrome on your laptop and Safari on your phone will each have separate data.</span></p><p><strong>Back up regularly.</strong><span>Use Export before clearing browser data, changing devices, or testing another browser.</span></p><p><strong>Private browsing is temporary.</strong><span>Incognito or private windows can delete this app data when the session ends.</span></p></div><button className="primary-action" type="button" onClick={onConfirm}>I understand</button></div></div>;
 }
 
 function ConfirmModal({ title, copy, confirmText, danger, onCancel, onConfirm }) {
