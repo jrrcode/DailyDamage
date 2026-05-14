@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .tools/
+.deploy-gh-pages/
 assets/logos/*.original.png
 backups/
 app.js
