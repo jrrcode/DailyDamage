@@ -84,7 +84,7 @@ button {
   top: 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: 160px 1fr minmax(430px, auto);
+  grid-template-columns: 160px 1fr minmax(330px, auto);
   align-items: center;
   gap: 18px;
   border-bottom: 1px solid transparent;
@@ -167,25 +167,15 @@ body.black-theme .sidebar.scrolled {
   margin-top: 0;
 }
 
-.backup-pill {
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 8px 10px;
-  color: var(--muted);
-  background: var(--surface-soft);
-  font-size: 0.72rem;
-  font-weight: 900;
-  white-space: nowrap;
+.backup-menu-wrap {
+  position: relative;
 }
 
-.backup-pill.due {
-  border-color: rgba(248, 113, 113, 0.34);
-  color: #f87171;
-  background: rgba(248, 113, 113, 0.1);
-}
-
-.backup-action {
+.backup-menu-button {
+  display: flex;
   min-height: 38px;
+  align-items: center;
+  gap: 8px;
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 0 12px;
@@ -195,9 +185,100 @@ body.black-theme .sidebar.scrolled {
   font-weight: 900;
 }
 
-.backup-action:hover {
+.backup-menu-button:hover,
+.backup-menu-wrap.open .backup-menu-button {
   border-color: rgba(20, 216, 196, 0.38);
   background: rgba(20, 216, 196, 0.12);
+}
+
+.backup-menu-button.due {
+  border-color: rgba(248, 113, 113, 0.34);
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.backup-icon {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-radius: 5px;
+}
+
+.backup-icon::before {
+  content: "";
+  position: absolute;
+  inset: 3px 4px auto;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.backup-icon::after {
+  content: "";
+  position: absolute;
+  right: 2px;
+  bottom: -5px;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.backup-dropdown {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 10px);
+  right: 0;
+  display: none;
+  width: min(330px, calc(100vw - 28px));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.backup-menu-wrap.open .backup-dropdown {
+  display: grid;
+}
+
+.backup-dropdown-head {
+  display: grid;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  padding: 13px;
+}
+
+.backup-dropdown-head strong {
+  font-size: 0.9rem;
+}
+
+.backup-dropdown-head span,
+.backup-dropdown button span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.backup-dropdown button {
+  display: grid;
+  gap: 4px;
+  border: 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  padding: 13px;
+  color: var(--ink);
+  background: transparent;
+  text-align: left;
+}
+
+.backup-dropdown button:hover {
+  background: var(--surface-soft);
+}
+
+.backup-dropdown button:last-child {
+  border-bottom: 0;
 }
 
 .backup-file-input {
@@ -376,6 +457,45 @@ h2 {
 
 .owner-reminder h2 {
   margin-bottom: 0;
+}
+
+.owner-backup-flow {
+  display: grid;
+  grid-template-columns: 1fr 28px 1fr 28px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.owner-backup-flow span {
+  display: grid;
+  min-height: 48px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+  background: var(--surface-soft);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.owner-backup-flow i {
+  display: block;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.owner-backup-flow i::after {
+  content: "";
+  display: block;
+  width: 8px;
+  height: 8px;
+  margin-top: -3px;
+  margin-left: auto;
+  border-top: 2px solid var(--accent);
+  border-right: 2px solid var(--accent);
+  transform: rotate(45deg);
 }
 
 .owner-reminder-list {
@@ -1915,10 +2035,29 @@ h2 {
     justify-content: center;
   }
 
-  .backup-pill {
+  .backup-menu-wrap {
     order: 3;
-    width: 100%;
-    text-align: center;
+  }
+
+  .backup-dropdown {
+    right: 50%;
+    transform: translateX(50%);
+  }
+
+  .owner-backup-flow {
+    grid-template-columns: 1fr;
+  }
+
+  .owner-backup-flow i {
+    width: 2px;
+    height: 18px;
+    justify-self: center;
+  }
+
+  .owner-backup-flow i::after {
+    margin-top: 10px;
+    margin-left: -3px;
+    transform: rotate(135deg);
   }
 
   .workspace {

@@ -251,6 +251,7 @@ function App() {
   const [ownerReminder, setOwnerReminder] = useState(initial.ownerReminder);
   const [storageReady, setStorageReady] = useState(false);
   const [storageNotice, setStorageNotice] = useState("");
+  const [backupMenuOpen, setBackupMenuOpen] = useState(false);
   const [forms, setForms] = useState({ money: false, expense: false, credit: false });
   const [modes, setModes] = useState({
     moneyDelete: {}, moneyEdit: {}, expenseDelete: {}, expenseEdit: {}, creditDelete: {}, creditEdit: {},
@@ -322,6 +323,7 @@ function App() {
     link.click();
     URL.revokeObjectURL(url);
     setBackupMeta({ lastBackupAt: exportedAt });
+    setBackupMenuOpen(false);
     setStorageNotice("Backup downloaded.");
   };
 
@@ -340,6 +342,7 @@ function App() {
         setSavings(data.savings.map((item) => ({ ...item, expanded: false })));
         setExpenses(data.expenses.map((item) => ({ ...item, expanded: false })));
         setCreditLoans(data.creditLoans.map((item) => ({ ...item, expanded: false })));
+        setBackupMenuOpen(false);
         setStorageNotice("Backup restored on this browser.");
       } catch {
         setStorageNotice("That file does not look like a Daily Damage backup.");
@@ -369,9 +372,17 @@ function App() {
         </nav>
         <div className="month-card">
           <label htmlFor="monthPicker">Workspace month</label>
-          <span className={`backup-pill ${backupAge >= BACKUP_STALE_DAYS ? "due" : ""}`}>{backupStatus}</span>
-          <button className="backup-action" type="button" onClick={exportBackup}>Export</button>
-          <button className="backup-action" type="button" onClick={() => importInputRef.current?.click()}>Import</button>
+          <div className={`backup-menu-wrap ${backupMenuOpen ? "open" : ""}`}>
+            <button className={`backup-menu-button ${backupAge >= BACKUP_STALE_DAYS ? "due" : ""}`} type="button" onClick={() => setBackupMenuOpen((open) => !open)} aria-expanded={backupMenuOpen}>
+              <span className="backup-icon" />
+              <span>{backupStatus}</span>
+            </button>
+            <div className="backup-dropdown">
+              <div className="backup-dropdown-head"><strong>Local backup</strong><span>{backupMeta.lastBackupAt ? `Last export: ${formatDate(backupMeta.lastBackupAt.slice(0, 10))}` : "No backup exported yet"}</span></div>
+              <button type="button" onClick={exportBackup}><strong>Export backup</strong><span>Downloads a JSON file. Keep it in Drive, OneDrive, or a safe folder.</span></button>
+              <button type="button" onClick={() => importInputRef.current?.click()}><strong>Import backup</strong><span>Restores this browser from a Daily Damage backup file.</span></button>
+            </div>
+          </div>
           <input ref={importInputRef} className="backup-file-input" type="file" accept="application/json,.json" onChange={importBackup} />
           <input id="monthPicker" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
           <button className="theme-toggle icon-only" data-theme-icon={theme === "black" ? "light" : "dark"} onClick={() => setTheme(theme === "black" ? "light" : "black")} type="button" aria-label={theme === "black" ? "Switch to light theme" : "Switch to dark theme"} title={theme === "black" ? "Switch to light theme" : "Switch to dark theme"} />
@@ -719,7 +730,7 @@ function ActionRow({ onCancel, onSave }) {
 }
 
 function OwnerReminder({ onConfirm }) {
-  return <div className="modal-backdrop" role="dialog" aria-modal="true"><div className="owner-reminder"><p className="eyebrow">Before using Daily Damage</p><h2>Your data is local to this browser</h2><div className="owner-reminder-list"><p><strong>Use the same browser.</strong><span>Chrome on your laptop and Safari on your phone will each have separate data.</span></p><p><strong>Back up regularly.</strong><span>Use Export before clearing browser data, changing devices, or testing another browser.</span></p><p><strong>Private browsing is temporary.</strong><span>Incognito or private windows can delete this app data when the session ends.</span></p></div><button className="primary-action" type="button" onClick={onConfirm}>I understand</button></div></div>;
+  return <div className="modal-backdrop" role="dialog" aria-modal="true"><div className="owner-reminder"><p className="eyebrow">Before using Daily Damage</p><h2>Your data is local to this browser</h2><div className="owner-backup-flow"><span>Backup</span><i /><span>Export file</span><i /><span>Import later</span></div><div className="owner-reminder-list"><p><strong>Use the same browser.</strong><span>Chrome on your laptop and Safari on your phone will each have separate data.</span></p><p><strong>Keep exported files somewhere safe.</strong><span>The Backup button downloads a JSON file. Save it in Drive, OneDrive, iCloud, or another folder you will not delete.</span></p><p><strong>Restore with Import.</strong><span>On a new browser or device, open Backup, choose Import, then select the exported Daily Damage file.</span></p><p><strong>Private browsing is temporary.</strong><span>Incognito or private windows can delete this app data when the session ends.</span></p></div><button className="primary-action" type="button" onClick={onConfirm}>I understand</button></div></div>;
 }
 
 function ConfirmModal({ title, copy, confirmText, danger, onCancel, onConfirm }) {
