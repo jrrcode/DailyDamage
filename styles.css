@@ -74,7 +74,7 @@ button {
 
 .app-shell {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto 1fr auto;
   height: 100vh;
   overflow: hidden;
 }
@@ -170,6 +170,10 @@ body.black-theme .sidebar.scrolled {
   margin-top: 0;
 }
 
+.backup-menu-wrap {
+  position: relative;
+}
+
 .backup-menu-button {
   display: flex;
   min-height: 38px;
@@ -185,7 +189,7 @@ body.black-theme .sidebar.scrolled {
 }
 
 .backup-menu-button:hover,
-.backup-dock.open .backup-menu-button {
+.backup-menu-wrap.open .backup-menu-button {
   border-color: rgba(20, 216, 196, 0.38);
   background: rgba(20, 216, 196, 0.12);
 }
@@ -228,8 +232,8 @@ body.black-theme .sidebar.scrolled {
 .backup-dropdown {
   position: absolute;
   z-index: 50;
-  right: 50%;
-  bottom: calc(100% + 10px);
+  top: calc(100% + 10px);
+  right: 0;
   display: none;
   width: min(330px, calc(100vw - 28px));
   overflow: hidden;
@@ -237,10 +241,9 @@ body.black-theme .sidebar.scrolled {
   border-radius: 18px;
   background: var(--surface);
   box-shadow: var(--shadow);
-  transform: translateX(50%);
 }
 
-.backup-dock.open .backup-dropdown {
+.backup-menu-wrap.open .backup-dropdown {
   display: grid;
 }
 
@@ -285,14 +288,6 @@ body.black-theme .sidebar.scrolled {
   display: none;
 }
 
-.backup-dock {
-  position: fixed;
-  right: 50%;
-  bottom: 18px;
-  z-index: 70;
-  transform: translateX(50%);
-}
-
 .month-card input {
   width: 160px;
   border: 1px solid var(--line);
@@ -306,6 +301,37 @@ body.black-theme .sidebar.scrolled {
 body.black-theme .month-card input {
   background: rgba(255, 255, 255, 0.04);
   color-scheme: dark;
+}
+
+.app-footer {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+body.black-theme .app-footer {
+  background: rgba(9, 9, 9, 0.82);
+}
+
+.app-footer label {
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.app-footer input {
+  width: 160px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 9px 12px;
+  color: var(--ink);
+  background: var(--surface-soft);
 }
 
 .workspace {
@@ -2141,7 +2167,7 @@ h2 {
 
 @media (max-width: 860px) {
   .app-shell {
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto 1fr auto;
   }
 
   .sidebar {
@@ -2172,6 +2198,11 @@ h2 {
     width: 100%;
     flex-wrap: wrap;
     justify-content: center;
+  }
+
+  .backup-dropdown {
+    right: 50%;
+    transform: translateX(50%);
   }
 
   .owner-backup-flow {

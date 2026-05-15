@@ -371,9 +371,18 @@ function App() {
           ].map(([key, label]) => <button key={key} className={`nav-item ${view === key ? "active" : ""}`} onClick={() => setView(key)} type="button">{label}</button>)}
         </nav>
         <div className="month-card">
-          <label htmlFor="monthPicker">Workspace month</label>
+          <div className={`backup-menu-wrap ${backupMenuOpen ? "open" : ""}`}>
+            <button className={`backup-menu-button ${backupAge >= BACKUP_STALE_DAYS ? "due" : ""}`} type="button" onClick={() => setBackupMenuOpen((open) => !open)} aria-expanded={backupMenuOpen}>
+              <span className="backup-icon" />
+              <span>{backupStatus}</span>
+            </button>
+            <div className="backup-dropdown">
+              <div className="backup-dropdown-head"><strong>Local backup</strong><span>{backupMeta.lastBackupAt ? `Last export: ${formatDate(backupMeta.lastBackupAt.slice(0, 10))}` : "No backup exported yet"}</span></div>
+              <button type="button" onClick={exportBackup}><strong>Export backup</strong><span>Downloads a JSON file. Keep it in Drive, OneDrive, or a safe folder.</span></button>
+              <button type="button" onClick={() => importInputRef.current?.click()}><strong>Import backup</strong><span>Restores this browser from a Daily Damage backup file.</span></button>
+            </div>
+          </div>
           <input ref={importInputRef} className="backup-file-input" type="file" accept="application/json,.json" onChange={importBackup} />
-          <input id="monthPicker" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
           <button className="theme-toggle icon-only" data-theme-icon={theme === "black" ? "light" : "dark"} onClick={() => setTheme(theme === "black" ? "light" : "black")} type="button" aria-label={theme === "black" ? "Switch to light theme" : "Switch to dark theme"} title={theme === "black" ? "Switch to light theme" : "Switch to dark theme"} />
         </div>
       </header>
@@ -383,20 +392,10 @@ function App() {
         <section className={`view ${view === "savings" ? "active" : ""}`}><Money savings={savings} setSavings={setSavings} forms={forms} setForms={setForms} modes={modes} setModes={setModes} editing={editing} setEditing={setEditing} setModal={setModal} /></section>
         <section className={`view ${view === "creditLoans" ? "active" : ""}`}><CreditLoans creditLoans={creditLoans} setCreditLoans={setCreditLoans} forms={forms} setForms={setForms} modes={modes} setModes={setModes} editing={editing} setEditing={setEditing} setModal={setModal} /></section>
       </main>
+      <footer className="app-footer"><label htmlFor="monthPicker">Workspace month</label><input id="monthPicker" type="month" value={month} onChange={(event) => setMonth(event.target.value)} /></footer>
       {modal?.type === "delete" && <ConfirmModal title={`Delete ${modal.name}?`} copy={modal.copy} confirmText={modal.confirmText || "Delete"} danger onCancel={() => setModal(null)} onConfirm={() => { modal.onConfirm(); setModal(null); }} />}
       {modal?.type === "pay" && <ConfirmModal title={`Pay ${modal.expense.reason}?`} copy={modal.copy} confirmText="Confirm paid" onCancel={() => setModal(null)} onConfirm={() => { modal.onConfirm(); setModal(null); }} />}
       {storageReady && !ownerReminder.acknowledgedAt && <OwnerReminder onConfirm={() => setOwnerReminder({ acknowledgedAt: new Date().toISOString() })} />}
-      <div className={`backup-dock ${backupMenuOpen ? "open" : ""}`}>
-        <button className={`backup-menu-button ${backupAge >= BACKUP_STALE_DAYS ? "due" : ""}`} type="button" onClick={() => setBackupMenuOpen((open) => !open)} aria-expanded={backupMenuOpen}>
-          <span className="backup-icon" />
-          <span>{backupStatus}</span>
-        </button>
-        <div className="backup-dropdown">
-          <div className="backup-dropdown-head"><strong>Local backup</strong><span>{backupMeta.lastBackupAt ? `Last export: ${formatDate(backupMeta.lastBackupAt.slice(0, 10))}` : "No backup exported yet"}</span></div>
-          <button type="button" onClick={exportBackup}><strong>Export backup</strong><span>Downloads a JSON file. Keep it in Drive, OneDrive, or a safe folder.</span></button>
-          <button type="button" onClick={() => importInputRef.current?.click()}><strong>Import backup</strong><span>Restores this browser from a Daily Damage backup file.</span></button>
-        </div>
-      </div>
       {storageNotice && <div className="storage-toast"><span>{storageNotice}</span><button type="button" onClick={() => setStorageNotice("")}>Dismiss</button></div>}
     </div>
   );
@@ -424,7 +423,7 @@ function Dashboard({ savings, expenses, creditLoans, month }) {
 
   return (
     <div className="dashboard-shell">
-      <div className="section-head dashboard-head"><div><p className="eyebrow">Dashboard</p><h2>Financial snapshot</h2></div><span className="dashboard-month">{month}</span></div>
+      <div className="section-head dashboard-head"><div><p className="eyebrow">Dashboard</p><h2>Financial snapshot</h2></div></div>
       <section className="dashboard-top">
         <Panel title="Money watchlist">
           <Task icon="wallet" label="Cash + wallets" value={formatCurrency(sumBy([...banks, ...wallets], (a) => a.amount))} tone="positive" />
