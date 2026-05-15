@@ -84,7 +84,7 @@ button {
   top: 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: 160px 1fr minmax(330px, auto);
+  grid-template-columns: 160px 1fr 220px;
   align-items: center;
   gap: 18px;
   border-bottom: 1px solid transparent;
@@ -170,10 +170,6 @@ body.black-theme .sidebar.scrolled {
   margin-top: 0;
 }
 
-.backup-menu-wrap {
-  position: relative;
-}
-
 .backup-menu-button {
   display: flex;
   min-height: 38px;
@@ -189,7 +185,7 @@ body.black-theme .sidebar.scrolled {
 }
 
 .backup-menu-button:hover,
-.backup-menu-wrap.open .backup-menu-button {
+.backup-dock.open .backup-menu-button {
   border-color: rgba(20, 216, 196, 0.38);
   background: rgba(20, 216, 196, 0.12);
 }
@@ -232,8 +228,8 @@ body.black-theme .sidebar.scrolled {
 .backup-dropdown {
   position: absolute;
   z-index: 50;
-  top: calc(100% + 10px);
-  right: 0;
+  right: 50%;
+  bottom: calc(100% + 10px);
   display: none;
   width: min(330px, calc(100vw - 28px));
   overflow: hidden;
@@ -241,9 +237,10 @@ body.black-theme .sidebar.scrolled {
   border-radius: 18px;
   background: var(--surface);
   box-shadow: var(--shadow);
+  transform: translateX(50%);
 }
 
-.backup-menu-wrap.open .backup-dropdown {
+.backup-dock.open .backup-dropdown {
   display: grid;
 }
 
@@ -286,6 +283,14 @@ body.black-theme .sidebar.scrolled {
 
 .backup-file-input {
   display: none;
+}
+
+.backup-dock {
+  position: fixed;
+  right: 50%;
+  bottom: 18px;
+  z-index: 70;
+  transform: translateX(50%);
 }
 
 .month-card input {
@@ -2167,15 +2172,6 @@ h2 {
     width: 100%;
     flex-wrap: wrap;
     justify-content: center;
-  }
-
-  .backup-menu-wrap {
-    order: 3;
-  }
-
-  .backup-dropdown {
-    right: 50%;
-    transform: translateX(50%);
   }
 
   .owner-backup-flow {
