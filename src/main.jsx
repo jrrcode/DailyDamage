@@ -427,18 +427,18 @@ function Dashboard({ savings, expenses, creditLoans, month }) {
       <div className="section-head dashboard-head"><div><p className="eyebrow">Dashboard</p><h2>Financial snapshot</h2></div><span className="dashboard-month">{month}</span></div>
       <section className="dashboard-top">
         <Panel title="Money watchlist">
-          <Task label="Cash + wallets" value={formatCurrency(sumBy([...banks, ...wallets], (a) => a.amount))} tone="positive" />
-          <Task label="Unpaid recurring" value={unpaid.length} tone={unpaid.length ? "danger" : "positive"} />
-          <Task label="Open credit/loans" value={formatCurrency(sumBy(creditLoans, (c) => c.balance))} tone="danger" />
-          <Task label="Total spent" value={formatCurrency(spent)} tone="warning" />
+          <Task icon="wallet" label="Cash + wallets" value={formatCurrency(sumBy([...banks, ...wallets], (a) => a.amount))} tone="positive" />
+          <Task icon="alert" label="Unpaid recurring" value={unpaid.length} tone={unpaid.length ? "danger" : "positive"} />
+          <Task icon="debt" label="Open credit/loans" value={formatCurrency(sumBy(creditLoans, (c) => c.balance))} tone="danger" />
+          <Task icon="spend" label="Total spent" value={formatCurrency(spent)} tone="warning" />
         </Panel>
         <RecentTable expenses={recent} savings={savings} />
       </section>
       <section className="dashboard-quick">
-        <Quick label="Cash + wallets" value={sumBy([...banks, ...wallets], (a) => a.amount)} meta={`${banks.length + wallets.length} accounts`} tone="positive" />
-        <Quick label="Card limits" value={sumBy(cards, (a) => a.amount)} meta={`${cards.length} cards`} />
-        <Quick label="Recurring unpaid" value={sumBy(unpaid, (e) => e.amount)} meta={`${unpaid.length} due`} tone="danger" />
-        <Quick label="Credit/loans" value={sumBy(creditLoans, (c) => c.balance)} meta={`${creditLoans.length} balances`} tone="warning" />
+        <Quick icon="wallet" label="Cash + wallets" value={sumBy([...banks, ...wallets], (a) => a.amount)} meta={`${banks.length + wallets.length} accounts`} tone="positive" />
+        <Quick icon="card" label="Card limits" value={sumBy(cards, (a) => a.amount)} meta={`${cards.length} cards`} />
+        <Quick icon="alert" label="Recurring unpaid" value={sumBy(unpaid, (e) => e.amount)} meta={`${unpaid.length} due`} tone="danger" />
+        <Quick icon="debt" label="Credit/loans" value={sumBy(creditLoans, (c) => c.balance)} meta={`${creditLoans.length} balances`} tone="warning" />
       </section>
       <section className="dashboard-report">
         <div className="dashboard-report-head"><h3>Monthly report</h3><span>{month}</span></div>
@@ -481,16 +481,20 @@ function Panel({ title, children }) {
   return <article className="dashboard-panel"><h3>{title}</h3><div className="dashboard-list">{children}</div></article>;
 }
 
-function Task({ label, value, tone }) {
-  return <div className={`dashboard-task ${tone || ""}`}><span>{label}</span><b>{value}</b></div>;
+function FinanceIcon({ type }) {
+  return <i className={`finance-icon ${type || "wallet"}`} aria-hidden="true" />;
 }
 
-function Quick({ label, value, meta, tone }) {
-  return <article className={`dashboard-quick-card ${tone || ""}`}><span>{label}</span><strong>{formatCurrency(value)}</strong><small>{meta}</small></article>;
+function Task({ icon, label, value, tone }) {
+  return <div className={`dashboard-task ${tone || ""}`}><span><FinanceIcon type={icon} />{label}</span><b>{value}</b></div>;
+}
+
+function Quick({ icon, label, value, meta, tone }) {
+  return <article className={`dashboard-quick-card ${tone || ""}`}><div className="quick-card-head"><FinanceIcon type={icon} /><span>{label}</span></div><strong>{formatCurrency(value)}</strong><small>{meta}</small></article>;
 }
 
 function RecentTable({ expenses, savings }) {
-  return <article className="dashboard-panel dashboard-table"><h3>Recent expenses</h3><div className="dashboard-table-head"><span>Subject</span><span>Account</span><span>Type</span><span>Amount</span></div>{expenses.length ? expenses.map((e) => {
+  return <article className="dashboard-panel dashboard-table"><h3><FinanceIcon type="spend" />Recent expenses</h3><div className="dashboard-table-head"><span>Subject</span><span>Account</span><span>Type</span><span>Amount</span></div>{expenses.length ? expenses.map((e) => {
     const account = savings.find((a) => a.id === e.accountId);
     return <div className="dashboard-table-row" key={e.id}><span>{e.reason || "Expense"}</span><span>{account?.bank || "Account removed"}</span><span>{e.type === "recurring" ? recurringFrequencyLabel(e.frequency) : "One-time"}</span><b>{formatCurrency(e.amount)}</b></div>;
   }) : <Empty text="No recent expenses" />}</article>;
