@@ -364,26 +364,28 @@ function App() {
   return (
     <div className="app-shell">
       <header className={`sidebar ${scrolled ? "scrolled" : ""}`}>
-        <div className="brand"><img className="brand-logo" src="assets/logos/DailyDamage.png" alt="Daily Damage" /></div>
-        <nav className="nav" aria-label="Primary">
-          {[
-            ["dashboard", "Dashboard"], ["expenses", "Expenses"], ["savings", "Money"], ["creditLoans", "Credit/Loans"],
-          ].map(([key, label]) => <button key={key} className={`nav-item ${view === key ? "active" : ""}`} onClick={() => setView(key)} type="button">{label}</button>)}
-        </nav>
-        <div className="month-card">
-          <div className={`backup-menu-wrap ${backupMenuOpen ? "open" : ""}`}>
-            <button className={`backup-menu-button ${backupAge >= BACKUP_STALE_DAYS ? "due" : ""}`} type="button" onClick={() => setBackupMenuOpen((open) => !open)} aria-expanded={backupMenuOpen}>
-              <span className="backup-icon" />
-              <span>{backupStatus}</span>
-            </button>
-            <div className="backup-dropdown">
-              <div className="backup-dropdown-head"><strong>Local backup</strong><span>{backupMeta.lastBackupAt ? `Last export: ${formatDate(backupMeta.lastBackupAt.slice(0, 10))}` : "No backup exported yet"}</span></div>
-              <button type="button" onClick={exportBackup}><strong>Export backup</strong><span>Downloads a JSON file. Keep it in Drive, OneDrive, or a safe folder.</span></button>
-              <button type="button" onClick={() => importInputRef.current?.click()}><strong>Import backup</strong><span>Restores this browser from a Daily Damage backup file.</span></button>
+        <div className="nav-bar">
+          <div className="brand"><img className="brand-logo" src="assets/logos/DailyDamage.png" alt="Daily Damage" /></div>
+          <nav className="nav" aria-label="Primary">
+            {[
+              ["dashboard", "Dashboard"], ["expenses", "Expenses"], ["savings", "Money"], ["creditLoans", "Credit/Loans"],
+            ].map(([key, label]) => <button key={key} className={`nav-item ${view === key ? "active" : ""}`} onClick={() => setView(key)} type="button">{label}</button>)}
+          </nav>
+          <div className="month-card">
+            <div className={`backup-menu-wrap ${backupMenuOpen ? "open" : ""}`}>
+              <button className={`backup-menu-button ${backupAge >= BACKUP_STALE_DAYS ? "due" : ""}`} type="button" onClick={() => setBackupMenuOpen((open) => !open)} aria-expanded={backupMenuOpen}>
+                <span className="backup-icon" />
+                <span>{backupStatus}</span>
+              </button>
+              <div className="backup-dropdown">
+                <div className="backup-dropdown-head"><strong>Local backup</strong><span>{backupMeta.lastBackupAt ? `Last export: ${formatDate(backupMeta.lastBackupAt.slice(0, 10))}` : "No backup exported yet"}</span></div>
+                <button type="button" onClick={exportBackup}><strong>Export backup</strong><span>Downloads a JSON file. Keep it in Drive, OneDrive, or a safe folder.</span></button>
+                <button type="button" onClick={() => importInputRef.current?.click()}><strong>Import backup</strong><span>Restores this browser from a Daily Damage backup file.</span></button>
+              </div>
             </div>
+            <input ref={importInputRef} className="backup-file-input" type="file" accept="application/json,.json" onChange={importBackup} />
+            <button className="theme-toggle icon-only" data-theme-icon={theme === "black" ? "light" : "dark"} onClick={() => setTheme(theme === "black" ? "light" : "black")} type="button" aria-label={theme === "black" ? "Switch to light theme" : "Switch to dark theme"} title={theme === "black" ? "Switch to light theme" : "Switch to dark theme"} />
           </div>
-          <input ref={importInputRef} className="backup-file-input" type="file" accept="application/json,.json" onChange={importBackup} />
-          <button className="theme-toggle icon-only" data-theme-icon={theme === "black" ? "light" : "dark"} onClick={() => setTheme(theme === "black" ? "light" : "black")} type="button" aria-label={theme === "black" ? "Switch to light theme" : "Switch to dark theme"} title={theme === "black" ? "Switch to light theme" : "Switch to dark theme"} />
         </div>
       </header>
       <main className="workspace" onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 8)}>

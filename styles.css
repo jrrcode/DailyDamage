@@ -83,12 +83,9 @@ button {
   position: sticky;
   top: 0;
   z-index: 40;
-  display: grid;
-  grid-template-columns: 160px 1fr 220px;
-  align-items: center;
-  gap: 18px;
+  display: block;
   border-bottom: 1px solid transparent;
-  padding: 14px 28px;
+  padding: 12px 24px;
   color: var(--ink);
   background: transparent;
   box-shadow: none;
@@ -113,9 +110,19 @@ body.black-theme .sidebar.scrolled {
   background: rgba(9, 9, 9, 0.88);
 }
 
+.nav-bar {
+  position: relative;
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(140px, 1fr) auto minmax(220px, 1fr);
+  align-items: center;
+  gap: 18px;
+}
+
 .brand {
   display: flex;
   align-items: center;
+  justify-self: start;
   min-width: 0;
 }
 
@@ -134,10 +141,8 @@ body.black-theme .sidebar.scrolled {
 }
 
 .nav {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
+  justify-self: center;
   justify-content: center;
   gap: 24px;
 }
@@ -165,6 +170,7 @@ body.black-theme .sidebar.scrolled {
 .month-card {
   display: flex;
   align-items: center;
+  justify-self: end;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 0;
@@ -2171,10 +2177,13 @@ h2 {
   }
 
   .sidebar {
+    padding: 12px 18px;
+  }
+
+  .nav-bar {
     grid-template-columns: 1fr;
     justify-items: center;
     gap: 12px;
-    padding: 12px 18px;
   }
 
   .brand-logo {
@@ -2182,8 +2191,6 @@ h2 {
   }
 
   .nav {
-    position: static;
-    transform: none;
     width: 100%;
     justify-content: flex-start;
     overflow-x: auto;
