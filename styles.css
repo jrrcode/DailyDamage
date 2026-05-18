@@ -487,12 +487,15 @@ h2 {
 .owner-reminder {
   display: grid;
   width: min(500px, 100%);
+  max-height: calc(100dvh - 48px);
   gap: 16px;
   border: 1px solid rgba(20, 216, 196, 0.26);
   border-radius: 20px;
   padding: 24px;
+  overflow-y: auto;
   background: var(--surface);
   box-shadow: 0 24px 90px rgba(0, 0, 0, 0.58);
+  overscroll-behavior: contain;
 }
 
 .owner-reminder h2 {
@@ -560,6 +563,10 @@ h2 {
   color: var(--muted);
   font-size: 0.82rem;
   line-height: 1.45;
+}
+
+.owner-reminder > .primary-action {
+  min-height: 44px;
 }
 
 .delete-modal h2 {
@@ -2260,20 +2267,62 @@ h2 {
     transform: translateX(50%);
   }
 
+  .modal-backdrop {
+    align-items: start;
+    padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+    overflow-y: auto;
+  }
+
+  .owner-reminder {
+    width: 100%;
+    max-height: calc(100dvh - 24px);
+    gap: 12px;
+    border-radius: 18px;
+    padding: 16px;
+  }
+
+  .owner-reminder h2 {
+    font-size: clamp(1.25rem, 7vw, 1.65rem);
+  }
+
   .owner-backup-flow {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .owner-backup-flow span {
+    min-height: 40px;
+    padding: 0 6px;
+    font-size: 0.7rem;
   }
 
   .owner-backup-flow i {
-    width: 2px;
-    height: 18px;
-    justify-self: center;
+    display: none;
   }
 
-  .owner-backup-flow i::after {
-    margin-top: 10px;
-    margin-left: -3px;
-    transform: rotate(135deg);
+  .owner-reminder-list {
+    gap: 8px;
+  }
+
+  .owner-reminder-list p {
+    padding: 10px;
+  }
+
+  .owner-reminder-list strong {
+    font-size: 0.82rem;
+  }
+
+  .owner-reminder-list span {
+    font-size: 0.76rem;
+    line-height: 1.35;
+  }
+
+  .owner-reminder > .primary-action {
+    position: sticky;
+    bottom: -1px;
+    z-index: 1;
+    width: 100%;
+    box-shadow: 0 -12px 26px var(--surface);
   }
 
   .workspace {
