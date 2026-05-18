@@ -1267,29 +1267,33 @@ h2 {
   font-weight: 800;
 }
 
+.account-donut-card {
+  min-height: 238px;
+}
+
 .donut-wrap {
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
+  grid-template-columns: minmax(160px, 180px) minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
 .donut-chart {
-  width: 120px;
-  height: 120px;
+  width: min(180px, 100%);
+  height: auto;
   transform: rotate(-90deg);
 }
 
 .donut-track {
   fill: none;
   stroke: var(--line);
-  stroke-width: 16;
+  stroke-width: 22;
 }
 
 .donut-segment {
   fill: none;
   stroke-linecap: round;
-  stroke-width: 16;
+  stroke-width: 22;
   transition: stroke-dasharray 480ms ease;
 }
 
@@ -1297,17 +1301,17 @@ h2 {
 .donut-caption {
   fill: var(--ink);
   transform: rotate(90deg);
-  transform-origin: 60px 60px;
+  transform-origin: 90px 90px;
 }
 
 .donut-total {
-  font-size: 1.35rem;
+  font-size: 1.75rem;
   font-weight: 950;
 }
 
 .donut-caption {
   fill: var(--muted);
-  font-size: 0.56rem;
+  font-size: 0.68rem;
   font-weight: 850;
   text-transform: uppercase;
 }
@@ -1516,6 +1520,50 @@ h2 {
 
 .expense-tile-grid {
   display: flex;
+}
+
+.recurring-groups {
+  display: grid;
+  gap: 14px;
+}
+
+.recurring-group {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: var(--surface-soft);
+}
+
+.recurring-group.paid {
+  border-color: rgba(20, 184, 166, 0.24);
+  background: rgba(20, 184, 166, 0.06);
+}
+
+.recurring-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.recurring-group-head b {
+  display: grid;
+  min-width: 28px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 0.72rem;
+}
+
+.recurring-group.paid .recurring-group-head span {
+  color: var(--accent);
 }
 
 .category-empty {

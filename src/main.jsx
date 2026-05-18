@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 
 const STORAGE = {
   backupMeta: "ledgerly:backupMeta",
+  autosaveHandle: "ledgerly:autosaveHandle",
   ownerReminder: "ledgerly:ownerReminder",
   theme: "ledgerly:theme",
   month: "ledgerly:month",
@@ -109,6 +110,41 @@ function datedFileStamp() {
 function daysSince(value) {
   if (!value) return Infinity;
   return Math.floor((Date.now() - new Date(value).getTime()) / 86400000);
+}
+
+function backupPayload({ theme, month, savings, expenses, creditLoans }) {
+  return {
+    app: "Daily Damage",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    data: {
+      theme,
+      month,
+      savings: cleanExpanded(savings),
+      expenses: cleanExpanded(expenses),
+      creditLoans: cleanExpanded(creditLoans),
+    },
+  };
+}
+
+function canUseFileBackups() {
+  return typeof window.showSaveFilePicker === "function";
+}
+
+async function hasWritePermission(fileHandle) {
+  if (!fileHandle?.queryPermission) return false;
+  return (await fileHandle.queryPermission({ mode: "readwrite" })) === "granted";
+}
+
+async function writeBackupHandle(fileHandle, payload) {
+  const writable = await fileHandle.createWritable();
+  await writable.write(JSON.stringify(payload, null, 2));
+  await writable.close();
+}
+
+function isRecurringPaidForCurrentCycle(expense) {
+  if (expense.type !== "recurring" || !(expense.paidDates || []).length) return false;
+  return daysUntil(recurringDueDate(expense)) > 0;
 }
 
 function todayISO() {
@@ -248,6 +284,7 @@ function App() {
   const [expenses, setExpenses] = useState(initial.expenses.map((item) => ({ ...item, expanded: false })));
   const [creditLoans, setCreditLoans] = useState(initial.creditLoans.map((item) => ({ ...item, expanded: false })));
   const [backupMeta, setBackupMeta] = useState(initial.backupMeta);
+  const [autosaveHandle, setAutosaveHandle] = useState(null);
   const [ownerReminder, setOwnerReminder] = useState(initial.ownerReminder);
   const [storageReady, setStorageReady] = useState(false);
   const [storageNotice, setStorageNotice] = useState("");
@@ -269,8 +306,9 @@ function App() {
       idbGet(STORAGE.expenses, initial.expenses),
       idbGet(STORAGE.creditLoans, initial.creditLoans),
       idbGet(STORAGE.backupMeta, initial.backupMeta),
+      idbGet(STORAGE.autosaveHandle, null),
       idbGet(STORAGE.ownerReminder, initial.ownerReminder),
-    ]).then(([nextTheme, nextMonth, nextSavings, nextExpenses, nextCreditLoans, nextBackupMeta, nextOwnerReminder]) => {
+    ]).then(([nextTheme, nextMonth, nextSavings, nextExpenses, nextCreditLoans, nextBackupMeta, nextAutosaveHandle, nextOwnerReminder]) => {
       if (!active) return;
       setTheme(nextTheme);
       setMonth(nextMonth);
@@ -278,6 +316,7 @@ function App() {
       setExpenses(nextExpenses.map((item) => ({ ...item, expanded: false })));
       setCreditLoans(nextCreditLoans.map((item) => ({ ...item, expanded: false })));
       setBackupMeta(nextBackupMeta);
+      setAutosaveHandle(nextAutosaveHandle);
       setOwnerReminder(nextOwnerReminder);
       setStorageReady(true);
     }).catch(() => {
@@ -296,6 +335,25 @@ function App() {
   useEffect(() => { if (storageReady) saveDurable(STORAGE.backupMeta, backupMeta); }, [backupMeta, storageReady]);
   useEffect(() => { if (storageReady) saveDurable(STORAGE.ownerReminder, ownerReminder); }, [ownerReminder, storageReady]);
   useEffect(() => {
+    if (!storageReady || !autosaveHandle) return undefined;
+    const timer = window.setTimeout(async () => {
+      if (!(await hasWritePermission(autosaveHandle))) {
+        setAutosaveHandle(null);
+        setBackupMeta((meta) => ({ ...meta, autosaveEnabled: false }));
+        setStorageNotice("Autosave file is paused. Open Backup and choose the file again.");
+        return;
+      }
+      const payload = backupPayload({ theme, month, savings, expenses, creditLoans });
+      try {
+        await writeBackupHandle(autosaveHandle, payload);
+        setBackupMeta((meta) => ({ ...meta, lastBackupAt: payload.exportedAt, autosaveEnabled: true, autosaveFileName: autosaveHandle.name }));
+      } catch {
+        setStorageNotice("Autosave file could not be updated. Export a backup manually.");
+      }
+    }, 650);
+    return () => window.clearTimeout(timer);
+  }, [theme, month, savings, expenses, creditLoans, autosaveHandle, storageReady]);
+  useEffect(() => {
     document.body.classList.toggle("black-theme", theme === "black");
   }, [theme]);
 
@@ -303,28 +361,38 @@ function App() {
   const backupStatus = !backupMeta.lastBackupAt ? "Backup needed" : backupAge >= BACKUP_STALE_DAYS ? `${backupAge}d since backup` : "Backed up";
 
   const exportBackup = () => {
-    const exportedAt = new Date().toISOString();
-    const payload = {
-      app: "Daily Damage",
-      version: 1,
-      exportedAt,
-      data: {
-        theme,
-        month,
-        savings: cleanExpanded(savings),
-        expenses: cleanExpanded(expenses),
-        creditLoans: cleanExpanded(creditLoans),
-      },
-    };
+    const payload = backupPayload({ theme, month, savings, expenses, creditLoans });
     const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
     const link = document.createElement("a");
     link.href = url;
     link.download = `daily-damage-backup-${datedFileStamp()}.json`;
     link.click();
     URL.revokeObjectURL(url);
-    setBackupMeta({ lastBackupAt: exportedAt });
+    setBackupMeta((meta) => ({ ...meta, lastBackupAt: payload.exportedAt }));
     setBackupMenuOpen(false);
     setStorageNotice("Backup downloaded.");
+  };
+
+  const enableAutosaveFile = async () => {
+    if (!canUseFileBackups()) {
+      setStorageNotice("Autosave files are not supported in this browser. Export backups manually instead.");
+      return;
+    }
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: "daily-damage-autosave.json",
+        types: [{ description: "Daily Damage backup", accept: { "application/json": [".json"] } }],
+      });
+      const payload = backupPayload({ theme, month, savings, expenses, creditLoans });
+      await writeBackupHandle(handle, payload);
+      await idbSet(STORAGE.autosaveHandle, handle);
+      setAutosaveHandle(handle);
+      setBackupMeta((meta) => ({ ...meta, lastBackupAt: payload.exportedAt, autosaveEnabled: true, autosaveFileName: handle.name }));
+      setBackupMenuOpen(false);
+      setStorageNotice(`Autosave file created: ${handle.name} in your selected folder.`);
+    } catch {
+      setStorageNotice("Autosave file was not created.");
+    }
   };
 
   const importBackup = (event) => {
@@ -378,7 +446,8 @@ function App() {
                 <span>{backupStatus}</span>
               </button>
               <div className="backup-dropdown">
-                <div className="backup-dropdown-head"><strong>Local backup</strong><span>{backupMeta.lastBackupAt ? `Last export: ${formatDate(backupMeta.lastBackupAt.slice(0, 10))}` : "No backup exported yet"}</span></div>
+                <div className="backup-dropdown-head"><strong>Local backup</strong><span>{backupMeta.autosaveEnabled ? `Autosaving to ${backupMeta.autosaveFileName || "selected file"}` : backupMeta.lastBackupAt ? `Last export: ${formatDate(backupMeta.lastBackupAt.slice(0, 10))}` : "No backup exported yet"}</span></div>
+                <button type="button" onClick={enableAutosaveFile}><strong>{backupMeta.autosaveEnabled ? "Change autosave file" : "Enable autosave file"}</strong><span>Creates one JSON file and keeps reusing it after each budget change.</span></button>
                 <button type="button" onClick={exportBackup}><strong>Export backup</strong><span>Downloads a JSON file. Keep it in Drive, OneDrive, or a safe folder.</span></button>
                 <button type="button" onClick={() => importInputRef.current?.click()}><strong>Import backup</strong><span>Restores this browser from a Daily Damage backup file.</span></button>
               </div>
@@ -526,19 +595,20 @@ function SpendingLineChart({ title, data }) {
 function AccountDonut({ title, data }) {
   const total = sumBy(data, (item) => item.value);
   let offset = 25;
-  const radius = 38;
+  const radius = 62;
+  const center = 90;
   const circumference = 2 * Math.PI * radius;
 
-  return <article className="insight-card"><div className="insight-card-head"><h4>{title}</h4><span>{formatCurrency(total)}</span></div>{data.length ? <div className="donut-wrap"><svg className="donut-chart" viewBox="0 0 120 120" role="img" aria-label={title}>
-    <circle className="donut-track" cx="60" cy="60" r={radius} />
+  return <article className="insight-card account-donut-card"><div className="insight-card-head"><h4>{title}</h4><span>{formatCurrency(total)}</span></div>{data.length ? <div className="donut-wrap"><svg className="donut-chart" viewBox="0 0 180 180" role="img" aria-label={title}>
+    <circle className="donut-track" cx={center} cy={center} r={radius} />
     {data.map((item) => {
       const dash = (item.value / total) * circumference;
-      const segment = <circle key={item.label} className="donut-segment" cx="60" cy="60" r={radius} stroke={item.color} strokeDasharray={`${dash} ${circumference - dash}`} strokeDashoffset={offset} />;
+      const segment = <circle key={item.label} className="donut-segment" cx={center} cy={center} r={radius} stroke={item.color} strokeDasharray={`${dash} ${circumference - dash}`} strokeDashoffset={offset} />;
       offset -= dash;
       return segment;
     })}
-    <text className="donut-total" x="60" y="57" textAnchor="middle">{data.length}</text>
-    <text className="donut-caption" x="60" y="72" textAnchor="middle">groups</text>
+    <text className="donut-total" x={center} y="87" textAnchor="middle">{data.length}</text>
+    <text className="donut-caption" x={center} y="106" textAnchor="middle">groups</text>
   </svg><div className="donut-legend">{data.map((item) => <div key={item.label}><i style={{ background: item.color }} /><span>{item.label}</span><b>{Math.round((item.value / total) * 100)}%</b></div>)}</div></div> : <Empty text="Add accounts to show distribution" />}</article>;
 }
 
@@ -629,6 +699,8 @@ function ExpenseCategory(props) {
   const { type, title, subtitle, expenses, allExpenses, setExpenses, modes, setModes } = props;
   const deleteMode = modes.expenseDelete[type];
   const editMode = modes.expenseEdit[type];
+  const paidRecurring = type === "recurring" ? expenses.filter(isRecurringPaidForCurrentCycle) : [];
+  const unpaidRecurring = type === "recurring" ? expenses.filter((expense) => !isRecurringPaidForCurrentCycle(expense)) : [];
   const toggleMode = (kind) => setModes((m) => ({ ...m, expenseDelete: { ...m.expenseDelete, [type]: kind === "delete" ? !deleteMode : false }, expenseEdit: { ...m.expenseEdit, [type]: kind === "edit" ? !editMode : false } }));
   const onDrop = (event) => {
     event.preventDefault();
@@ -637,18 +709,25 @@ function ExpenseCategory(props) {
     const target = event.target.closest("[data-expense-id]");
     if (target) setExpenses(reorder(allExpenses, payload.id, target.dataset.expenseId, (item) => (type === "recurring" ? item.type === "recurring" : item.type !== "recurring")));
   };
-  return <section className={`savings-category ${deleteMode ? "deleting" : ""} ${editMode ? "editing" : ""}`} data-expense-category={type}><CategoryHead title={title} subtitle={subtitle} disabled={!expenses.length} active={deleteMode || editMode} onEdit={() => toggleMode("edit")} editLabel={editMode ? "Stop editing" : "Edit order"} onDelete={() => toggleMode("delete")} deleteLabel={deleteMode ? "Stop deleting" : "Delete"} />{expenses.length ? <div className="savings-tile-grid expense-tile-grid" data-expense-tile-grid={type} onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>{expenses.map((e) => <ExpenseTile key={e.id} expense={e} editMode={editMode} {...props} />)}</div> : <div className="category-empty">No {type === "recurring" ? "recurring expenses" : "expenses"} added yet.</div>}</section>;
+  if (type === "recurring") {
+    return <section className={`savings-category ${deleteMode ? "deleting" : ""} ${editMode ? "editing" : ""}`} data-expense-category={type}><CategoryHead title={title} subtitle={subtitle} disabled={!expenses.length} active={deleteMode || editMode} onEdit={() => toggleMode("edit")} editLabel={editMode ? "Stop editing" : "Edit order"} onDelete={() => toggleMode("delete")} deleteLabel={deleteMode ? "Stop deleting" : "Delete"} />{expenses.length ? <div className="recurring-groups" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>{unpaidRecurring.length > 0 && <RecurringGroup title="Unpaid this cycle" count={unpaidRecurring.length}>{unpaidRecurring.map((e) => <ExpenseTile key={e.id} expense={e} editMode={editMode} {...props} />)}</RecurringGroup>}{paidRecurring.length > 0 && <RecurringGroup title="Paid this cycle" count={paidRecurring.length} paid>{paidRecurring.map((e) => <ExpenseTile key={e.id} expense={e} editMode={editMode} {...props} />)}</RecurringGroup>}</div> : <div className="category-empty">No recurring expenses added yet.</div>}</section>;
+  }
+  return <section className={`savings-category ${deleteMode ? "deleting" : ""} ${editMode ? "editing" : ""}`} data-expense-category={type}><CategoryHead title={title} subtitle={subtitle} disabled={!expenses.length} active={deleteMode || editMode} onEdit={() => toggleMode("edit")} editLabel={editMode ? "Stop editing" : "Edit order"} onDelete={() => toggleMode("delete")} deleteLabel={deleteMode ? "Stop deleting" : "Delete"} />{expenses.length ? <div className="savings-tile-grid expense-tile-grid" data-expense-tile-grid={type} onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>{expenses.map((e) => <ExpenseTile key={e.id} expense={e} editMode={editMode} {...props} />)}</div> : <div className="category-empty">No expenses added yet.</div>}</section>;
+}
+
+function RecurringGroup({ title, count, paid, children }) {
+  return <div className={`recurring-group ${paid ? "paid" : ""}`}><div className="recurring-group-head"><span>{title}</span><b>{count}</b></div><div className="savings-tile-grid expense-tile-grid">{children}</div></div>;
 }
 
 function ExpenseTile({ expense, editMode, allExpenses, setExpenses, savings, setSavings, editing, setEditing, setModal, deleteExpense }) {
   const account = savings.find((a) => a.id === expense.accountId);
   const isEditing = editing.expense === expense.id;
-  const hasPaid = Boolean((expense.paidDates || []).length);
   const isRecurring = expense.type === "recurring";
   const due = isRecurring ? recurringDueDate(expense) : expense.date;
   const dueIn = daysUntil(due);
+  const paidForCycle = isRecurringPaidForCurrentCycle(expense);
   const payable = isRecurring && (dueIn === "" || dueIn <= 0);
-  const badge = isRecurring ? (hasPaid ? availabilityLabel(expense) : "Unpaid") : "";
+  const badge = isRecurring ? (paidForCycle ? availabilityLabel(expense) : "Unpaid") : "";
   const [draft, setDraft] = useState({ icon: expense.icon || "🧾", amount: formatMoneyInput(expense.amount), date: expense.date || todayISO(), accountId: expense.accountId, reason: expense.reason || "", frequency: expense.frequency || "monthly" });
   useEffect(() => setDraft({ icon: expense.icon || "🧾", amount: formatMoneyInput(expense.amount), date: expense.date || todayISO(), accountId: expense.accountId, reason: expense.reason || "", frequency: expense.frequency || "monthly" }), [expense]);
   const saveEdit = () => {
@@ -663,8 +742,8 @@ function ExpenseTile({ expense, editMode, allExpenses, setExpenses, savings, set
   return <article className={`savings-tile expense-tile ${expense.expanded ? "expanded" : ""} ${isEditing ? "tile-editing" : ""}`} data-expense-id={expense.id} draggable={editMode} onDragStart={(e) => e.dataTransfer.setData("text/plain", JSON.stringify({ id: expense.id, category: isRecurring ? "recurring" : "expense", source: "expense" }))}>
     <button className="tile-delete-button" type="button" onClick={() => setModal({ type: "delete", name: expense.reason, copy: "This expense will be removed. Any deducted amount from this record will be returned to its account.", confirmText: "Delete expense", onConfirm: () => deleteExpense(expense) })}><span className="trash-icon" /></button>
     {expense.expanded && <TileMenu active={isEditing} onEdit={() => setEditing((x) => ({ ...x, expense: isEditing ? "" : expense.id }))} label={isEditing ? "Done editing" : "Edit details"} extra={<button type="button" onClick={() => setModal({ type: "delete", name: expense.reason, copy: "This expense will be removed. Any deducted amount from this record will be returned to its account.", confirmText: "Delete expense", onConfirm: () => deleteExpense(expense) })}>Delete</button>} />}
-    <button className="expense-summary" onClick={() => { if (!editMode) setExpenses((items) => items.map((item) => item.id === expense.id ? { ...item, expanded: !item.expanded } : item)); }} type="button"><span className="expense-icon">{expense.icon || "🧾"}</span><span><strong>{expense.reason}</strong><small className="account-number">{account?.bank || "Account removed"}</small><small>{isRecurring ? recurringFrequencyLabel(expense.frequency) : "One-time"}</small></span><span className="expense-amount"><b>{formatCurrency(expense.amount)}</b>{badge && <small className={`expense-counter ${!hasPaid ? "unpaid" : ""}`}>{badge}</small>}</span></button>
-    <div className="savings-detail">{isEditing ? <><Field label="Icon"><select className="savings-edit-input" value={draft.icon} onChange={(e) => setDraft({ ...draft, icon: e.target.value })}>{expenseIcons.map((i) => <option key={i.value} value={i.value}>{i.value} {i.label}</option>)}</select></Field><MoneyField label="Amount" value={draft.amount} onChange={(value) => setDraft({ ...draft, amount: value })} edit /><Field label={isRecurring ? "Start date" : "Date"}><input className="savings-edit-input" type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} /></Field>{isRecurring && <Field label="Frequency"><select className="savings-edit-input" value={draft.frequency} onChange={(e) => setDraft({ ...draft, frequency: e.target.value })}>{["monthly", "weekly", "biweekly", "daily", "annually"].map((f) => <option key={f} value={f}>{recurringFrequencyLabel(f)}</option>)}</select></Field>}<Field label="Account taken from"><select className="savings-edit-input" value={draft.accountId} onChange={(e) => setDraft({ ...draft, accountId: e.target.value })}>{savings.map((a) => <option key={a.id} value={a.id}>{accountLabel(a)} - {formatCurrency(a.amount)}</option>)}</select></Field><Field label="Reason"><input className="savings-edit-input" value={draft.reason} onChange={(e) => setDraft({ ...draft, reason: e.target.value })} /></Field><ActionRow onCancel={() => setEditing((x) => ({ ...x, expense: "" }))} onSave={saveEdit} /></> : <><div className="detail-grid"><Info label="Type" value={isRecurring ? "Recurring" : "Expense"} /><Info label="Amount" value={formatCurrency(expense.amount)} /><Info label={isRecurring ? "Next due" : "Date"} value={formatDate(due)} /><Info label="Account" value={account ? accountLabel(account) : "Account removed"} />{isRecurring && <><Info label="Frequency" value={recurringFrequencyLabel(expense.frequency)} /><Info label="Paid count" value={(expense.paidDates || []).length} /></>}<Info label="Reason" value={expense.reason || "Not set"} /></div>{isRecurring && <div className="pay-action"><button className="primary-action detail-save pay-button" type="button" disabled={!payable} onClick={pay}>{payable ? "Paid" : hasPaid ? "Paid" : "Upcoming"}</button></div>}</>}</div>
+    <button className="expense-summary" onClick={() => { if (!editMode) setExpenses((items) => items.map((item) => item.id === expense.id ? { ...item, expanded: !item.expanded } : item)); }} type="button"><span className="expense-icon">{expense.icon || "🧾"}</span><span><strong>{expense.reason}</strong><small className="account-number">{account?.bank || "Account removed"}</small><small>{isRecurring ? recurringFrequencyLabel(expense.frequency) : "One-time"}</small></span><span className="expense-amount"><b>{formatCurrency(expense.amount)}</b>{badge && <small className={`expense-counter ${!paidForCycle ? "unpaid" : ""}`}>{badge}</small>}</span></button>
+    <div className="savings-detail">{isEditing ? <><Field label="Icon"><select className="savings-edit-input" value={draft.icon} onChange={(e) => setDraft({ ...draft, icon: e.target.value })}>{expenseIcons.map((i) => <option key={i.value} value={i.value}>{i.value} {i.label}</option>)}</select></Field><MoneyField label="Amount" value={draft.amount} onChange={(value) => setDraft({ ...draft, amount: value })} edit /><Field label={isRecurring ? "Start date" : "Date"}><input className="savings-edit-input" type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} /></Field>{isRecurring && <Field label="Frequency"><select className="savings-edit-input" value={draft.frequency} onChange={(e) => setDraft({ ...draft, frequency: e.target.value })}>{["monthly", "weekly", "biweekly", "daily", "annually"].map((f) => <option key={f} value={f}>{recurringFrequencyLabel(f)}</option>)}</select></Field>}<Field label="Account taken from"><select className="savings-edit-input" value={draft.accountId} onChange={(e) => setDraft({ ...draft, accountId: e.target.value })}>{savings.map((a) => <option key={a.id} value={a.id}>{accountLabel(a)} - {formatCurrency(a.amount)}</option>)}</select></Field><Field label="Reason"><input className="savings-edit-input" value={draft.reason} onChange={(e) => setDraft({ ...draft, reason: e.target.value })} /></Field><ActionRow onCancel={() => setEditing((x) => ({ ...x, expense: "" }))} onSave={saveEdit} /></> : <><div className="detail-grid"><Info label="Type" value={isRecurring ? "Recurring" : "Expense"} /><Info label="Amount" value={formatCurrency(expense.amount)} /><Info label={isRecurring ? "Next due" : "Date"} value={formatDate(due)} /><Info label="Account" value={account ? accountLabel(account) : "Account removed"} />{isRecurring && <><Info label="Frequency" value={recurringFrequencyLabel(expense.frequency)} /><Info label="Paid count" value={(expense.paidDates || []).length} /></>}<Info label="Reason" value={expense.reason || "Not set"} /></div>{isRecurring && <div className="pay-action"><button className="primary-action detail-save pay-button" type="button" disabled={!payable} onClick={pay}>{payable ? "Paid" : paidForCycle ? "Paid" : "Upcoming"}</button></div>}</>}</div>
   </article>;
 }
 
